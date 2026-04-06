@@ -1,176 +1,194 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
+import plotly.express as px
 
-st.set_page_config(page_title="SDG Dashboard", layout="wide")
+st.set_page_config(layout="wide")
 
-st.title("🌍 ESG SDG Dashboard")
+st.title("🌍 TCS SDG Intelligence Dashboard")
 
-# ---------------- LOAD EXCEL ----------------
-FILE_NAME = "ESG_Audit_TCS.xlsx"
+# -------------------------
+# LOAD DATA
+# -------------------------
+df = pd.read_excel("tcs_sdg_full.xlsx")
+df = df.reset_index(drop=True)
 
-try:
-    df = pd.read_excel(ESG_Audit_TCS.xlsx)
-except:
-    st.error(f"❌ File '{FILE_NAME}' not found in repo")
+# -------------------------
+# ESG → SDG CONVERSION
+# -------------------------
+df["SDG1"] = df["Employee_Training_Hours"] * 0.8
+df["SDG2"] = df["Waste_Recycled_%"] * 0.9
+df["SDG3"] = df["Employee_Training_Hours"]
+df["SDG4"] = df["Employee_Training_Hours"] * 1.1
+df["SDG5"] = df["Women_Workforce_%"]
+df["SDG6"] = df["Water_Usage_Reduction_%"]
+df["SDG7"] = df["Renewable_Energy_%"]
+df["SDG8"] = df["Employee_Training_Hours"]
+df["SDG9"] = df["Renewable_Energy_%"] * 0.8
+df["SDG10"] = df["Women_Workforce_%"] * 0.9
+df["SDG11"] = df["Waste_Recycled_%"]
+df["SDG12"] = df["Waste_Recycled_%"]
+df["SDG13"] = df["Carbon_Emissions_Reduction_%"]
+df["SDG14"] = df["Water_Usage_Reduction_%"] * 0.8
+df["SDG15"] = df["Waste_Recycled_%"] * 0.7
+df["SDG16"] = df["Governance_Score"]
+df["SDG17"] = (df["Governance_Score"] + df["Employee_Training_Hours"]) / 2
+
+# -------------------------
+# SDG COLUMNS
+# -------------------------
+sdg_cols = [col for col in df.columns if col.startswith("SDG")]
+
+if len(sdg_cols) == 0:
+    st.error("❌ SDG columns not found")
     st.stop()
 
-st.subheader("📄 Dataset Preview")
-st.dataframe(df)
+# -------------------------
+# SIDEBAR
+# -------------------------
+st.sidebar.header("🔎 Controls")
 
-# ---------------- HELPER FUNCTIONS ----------------
+year = st.sidebar.selectbox("Select Year", df["Year"])
+compare_toggle = st.sidebar.checkbox("Enable Comparison")
 
-def level_score(val):
-    val = str(val).lower()
-    if "low" in val:
-        return -3
-    elif "medium" in val:
-        return 0
-    elif "high" in val:
-        return 3
+if compare_toggle:
+    compare_year = st.sidebar.selectbox("Compare With", df["Year"])
+
+# -------------------------
+# FILTER DATA
+# -------------------------
+df_year = df[df["Year"] == year]
+
+if df_year.empty:
+    st.error("❌ No data for selected year")
+    st.stop()
+
+# -------------------------
+# EXTRACT SCORES
+# -------------------------
+scores = []
+for col in sdg_cols:
+    val = df_year[col].iloc[0]
+    scores.append(float(val))
+
+sdg_data = pd.DataFrame({
+    "SDG": sdg_cols,
+    "Score": scores
+})
+
+# -------------------------
+# KPI CARDS
+# -------------------------
+st.subheader(f"📊 SDG Overview ({year})")
+
+cols = st.columns(5)
+
+for i, sdg in enumerate(sdg_cols):
+    val = scores[i]
+
+    if val >= 80:
+        color = "🟢"
+    elif val >= 60:
+        color = "🟡"
     else:
-        return 0
+        color = "🔴"
 
-def normalize(x):
-    try:
-        return (float(x) / 20) - 2.5
-    except:
-        return 0
+    cols[i % 5].metric(sdg, f"{val:.1f} {color}")
 
-# ---------------- CALCULATION ----------------
+# -------------------------
+# BAR GRAPH
+# -------------------------
+st.subheader("📊 SDG Performance")
 
-all_scores = []
+fig = px.bar(
+    sdg_data,
+    x="SDG",
+    y="Score",
+    text="Score"
+)
 
-for _, row in df.iterrows():
+fig.update_traces(textposition="outside")
 
-    scores = [0] * 17
+st.plotly_chart(fig, use_container_width=True)
 
-    # Safe extraction (auto-handle missing columns)
-    energy = row.get("Energy", 50)
-    renewable = row.get("Renewable", 30)
-    water = row.get("Water", 50)
-    waste = row.get("Waste", "Medium")
-    transport = row.get("Transport", "Car")
-    education = row.get("Education", "Medium")
-    health = row.get("Health", "Medium")
-    equality = row.get("Equality", "Medium")
-    income = row.get("Income", "Medium")
-    employment = row.get("Employment", "Medium")
-    innovation = row.get("Innovation", "Medium")
-    governance = row.get("Governance", "Medium")
+# -------------------------
+# RADAR GRAPH
+# -------------------------
+st.subheader("🕸 SDG Radar Analysis")
 
-    # -------- ENVIRONMENT --------
-    scores[6] = normalize(renewable)*2 + normalize(100-energy)
-    scores[5] = normalize(water)
-    scores[11] = level_score(waste)
-    scores[12] = normalize(100-energy) + (3 if str(transport).lower()=="public" else -1)
-    scores[13] = level_score(waste) / 2
-    scores[14] = level_score(waste) / 2
+fig_radar = px.line_polar(
+    sdg_data,
+    r="Score",
+    theta="SDG",
+    line_close=True
+)
 
-    # -------- SOCIAL --------
-    scores[0] = level_score(income)
-    scores[1] = level_score(income) / 2
-    scores[2] = level_score(health)
-    scores[3] = level_score(education)
-    scores[4] = level_score(equality)
-    scores[9] = level_score(equality)
-    scores[10] = 2 if str(transport).lower()=="public" else -1
+st.plotly_chart(fig_radar, use_container_width=True)
 
-    # -------- GOVERNANCE --------
-    scores[7] = level_score(employment)
-    scores[8] = level_score(innovation)
-    scores[15] = level_score(governance)
-    scores[16] = (level_score(governance) + level_score(innovation)) / 2
+# -------------------------
+# INSIGHTS
+# -------------------------
+st.subheader("🧠 Insights")
 
-    # -------- CROSS-IMPACT (IMPORTANT 🔥) --------
-    # Spread impact so no SDG stays zero
-    scores[6] += scores[11] * 0.3   # waste affects environment
-    scores[12] += scores[6] * 0.2   # energy affects climate
-    scores[3] += scores[2] * 0.2    # health affects education
-    scores[8] += scores[7] * 0.3    # jobs affect innovation
+if len(sdg_data) > 0:
+    avg_score = sdg_data["Score"].mean()
+    best = sdg_data.loc[sdg_data["Score"].idxmax()]
+    worst = sdg_data.loc[sdg_data["Score"].idxmin()]
 
-    # Clamp (-5 to +5)
-    scores = [max(-5, min(5, s)) for s in scores]
+    st.info(f"""
+📈 Average SDG Score: {avg_score:.2f}
 
-    all_scores.append(scores)
+🏆 Best Performing: {best['SDG']} ({best['Score']:.1f})
 
-all_scores = np.array(all_scores)
+⚠️ Needs Improvement: {worst['SDG']} ({worst['Score']:.1f})
+""")
 
-# ---------------- ESG SCORES ----------------
+# -------------------------
+# LINE COMPARISON (OPTIONAL)
+# -------------------------
+if compare_toggle:
 
-env_indices = [5,6,11,12,13,14]
-soc_indices = [0,1,2,3,4,9,10]
-gov_indices = [7,8,15,16]
+    if year == compare_year:
+        st.warning("⚠️ Please select different years")
+    else:
+        st.subheader(f"📈 Comparison: {year} vs {compare_year}")
 
-env_score = np.mean(all_scores[:, env_indices])
-soc_score = np.mean(all_scores[:, soc_indices])
-gov_score = np.mean(all_scores[:, gov_indices])
+        df_compare = df[df["Year"] == compare_year]
 
-# ---------------- AVERAGE SDG ----------------
+        compare_scores = []
+        for col in sdg_cols:
+            compare_scores.append(float(df_compare[col].iloc[0]))
 
-avg_scores = np.mean(all_scores, axis=0)
+        compare_df = pd.DataFrame({
+            "SDG": sdg_cols,
+            str(year): scores,
+            str(compare_year): compare_scores
+        })
 
-st.subheader("📊 ESG Summary")
+        fig_line = px.line(
+            compare_df,
+            x="SDG",
+            y=[str(year), str(compare_year)],
+            markers=True
+        )
 
-col1, col2, col3 = st.columns(3)
-col1.metric("🌱 Environmental", round(env_score,2))
-col2.metric("👥 Social", round(soc_score,2))
-col3.metric("🏛 Governance", round(gov_score,2))
+        st.plotly_chart(fig_line, use_container_width=True)
 
-# ---------------- SDG GRID ----------------
+# -------------------------
+# TREND GRAPH
+# -------------------------
+st.subheader("📈 SDG Trends Over Time")
 
-st.subheader("📊 SDG Scores")
+fig_trend = px.line(
+    df,
+    x="Year",
+    y=sdg_cols,
+    markers=True
+)
 
-cols = st.columns(3)
-for i, s in enumerate(avg_scores):
-    cols[i % 3].metric(f"SDG {i+1}", round(s, 2))
+st.plotly_chart(fig_trend, use_container_width=True)
 
-# ---------------- RADAR CHART ----------------
-
-labels = [f"SDG{i+1}" for i in range(17)]
-values = avg_scores.tolist() + [avg_scores[0]]
-
-angles = np.linspace(0, 2*np.pi, len(labels), endpoint=False).tolist()
-angles += angles[:1]
-
-fig, ax = plt.subplots(figsize=(7,7), subplot_kw=dict(polar=True))
-
-ax.plot(angles, values)
-ax.fill(angles, values, alpha=0.25)
-
-ax.set_xticks(angles[:-1])
-ax.set_xticklabels(labels)
-
-ax.set_ylim(-5, 5)
-ax.set_title("🌍 SDG Performance Radar")
-
-st.pyplot(fig)
-
-# ---------------- INDIVIDUAL VIEW ----------------
-
-st.subheader("🔍 Analyze Individual Entry")
-
-index = st.selectbox("Select Row", df.index)
-
-selected_scores = all_scores[index]
-
-for i, s in enumerate(selected_scores):
-    st.write(f"SDG {i+1}: {round(s,2)}")
-
-# ---------------- INSIGHTS ----------------
-
-st.subheader("💡 Insights")
-
-best = np.argmax(avg_scores)
-worst = np.argmin(avg_scores)
-
-st.success(f"Best Performing: SDG {best+1}")
-st.error(f"Needs Improvement: SDG {worst+1}")
-
-if avg_scores[11] < 0:
-    st.write("➡ Improve waste management practices")
-if avg_scores[6] < 0:
-    st.write("➡ Increase renewable energy adoption")
-if avg_scores[4] < 0:
-    st.write("➡ Improve gender equality initiatives")
+# -------------------------
+# DATA TABLE
+# -------------------------
+st.subheader("📄 Data Table")
+st.dataframe(df)
