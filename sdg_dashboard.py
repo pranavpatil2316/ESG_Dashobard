@@ -6,6 +6,24 @@ st.set_page_config(layout="wide")
 
 st.title("🌍 TCS SDG Intelligence Dashboard")
 
+st.write("")
+st.markdown("""
+<div style="
+position: absolute;
+top: 15px;
+right: 25px;
+background-color: rgba(255,255,255,0.9);
+padding: 8px 12px;
+border-radius: 10px;
+box-shadow: 0px 2px 6px rgba(0,0,0,0.1);
+text-align: right;
+font-size: 13px;
+">
+<b>Pranav Patil</b> - 22108A0038<br>
+<b>Ayush Agrawal</b> - 22108A0068
+</div>
+""", unsafe_allow_html=True)
+
 # -------------------------
 # SDG NAMES
 # -------------------------
